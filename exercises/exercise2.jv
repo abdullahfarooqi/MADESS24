@@ -1,0 +1,57 @@
+pipeline TreesPipeline {
+    TreesExtractor -> TreesTextFileInterpreter;
+
+    TreesTextFileInterpreter
+        -> TreesCSVInterpreter
+        -> TreesTableInterpreter
+        -> TreesLoader;
+
+    // 6. Below the pipes, we usually define the blocks 
+    // that are connected by the pipes.
+
+    // 7. Blocks instantiate a blocktype by using the oftype keyword.
+    // The blocktype defines the available properties that the block
+    // can use to specify the intended behavior of the block 
+    block TreesExtractor oftype HttpExtractor {
+
+        // 8. Properties are assigned to concrete values.
+        // Here, we specify the URL where the file shall be downloaded from.
+        url: "https://opendata.rhein-kreis-neuss.de/api/v2/catalog/datasets/stadt-neuss-herbstpflanzung-2023/exports/csv";
+    }
+
+    // 9. The HttpExtractor requires no input and produces a binary file as output.
+    // This file has to be interpreted, e.g., as text file.
+    block TreesTextFileInterpreter oftype TextFileInterpreter { }
+
+    // 10. Next, we interpret the text file as sheet.
+    // A sheet only contains text cells and is useful for manipulating the shape of data before assigning more strict value types to cells.
+    block TreesCSVInterpreter oftype CSVInterpreter {
+        delimiter: ";";
+    }
+
+    block TreesTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "lfd_nr" oftype integer,
+            "stadtteil" oftype OnlyFurthStadt,
+            "standort" oftype text,
+            "baumart_botanisch" oftype text,
+            "id" oftype text,
+            "baumfamilie" oftype text
+        ];
+    }
+
+    block TreesLoader oftype SQLiteLoader {
+        table: "trees";
+        file: "./trees.sqlite";
+    }
+}
+
+valuetype OnlyFurthStadt oftype text {
+	constraints: [
+		StartswithFurth,
+	];
+}
+
+constraint StartswithFurth on text:
+	value matches /^Furth-/;
