@@ -53,7 +53,7 @@ pipeline GoodsTransportedPipeline {
     block GoodsTransportedTableInterpreter oftype TableInterpreter {
         header: true;
         columns: [
-            "year" oftype text,
+            "year" oftype integer,
             "month" oftype text,
             "goods_id" oftype TextSpecificPattern,
             "goods_name" oftype text,
