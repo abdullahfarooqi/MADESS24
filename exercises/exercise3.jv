@@ -1,0 +1,99 @@
+pipeline GoodsTransportedPipeline {
+    GoodsTransportedExtractor -> GoodsTransportedTextFileInterpreter;
+
+    GoodsTransportedTextFileInterpreter
+        -> GoodsTransportedCSVInterpreter
+        -> MetaDataRowsDeleter
+        -> ExtraColsDeleter
+        -> HeaderWriter
+        -> GoodsTransportedTableInterpreter
+        -> GoodsTransportedLoader;
+
+    // 6. Below the pipes, we usually define the blocks 
+    // that are connected by the pipes.
+
+    // 7. Blocks instantiate a blocktype by using the oftype keyword.
+    // The blocktype defines the available properties that the block
+    // can use to specify the intended behavior of the block 
+    block GoodsTransportedExtractor oftype HttpExtractor {
+
+        // 8. Properties are assigned to concrete values.
+        // Here, we specify the URL where the file shall be downloaded from.
+        url: "https://www-genesis.destatis.de/genesis/downloads/00/tables/46131-0014_00.csv";
+    }
+
+    // 9. The HttpExtractor requires no input and produces a binary file as output.
+    // This file has to be interpreted, e.g., as text file.
+    block GoodsTransportedTextFileInterpreter oftype TextFileInterpreter { }
+
+    // 10. Next, we interpret the text file as sheet.
+    // A sheet only contains text cells and is useful for manipulating the shape of data before assigning more strict value types to cells.
+    block GoodsTransportedCSVInterpreter oftype CSVInterpreter {
+        delimiter: ";";
+    }
+
+    block MetaDataRowsDeleter oftype RowDeleter {
+        delete: [row 1, row 2, row 3, row 4, row 5, row 6, row 7, row 41337, row 41338, row 41339];
+    }
+
+    block ExtraColsDeleter oftype ColumnDeleter {
+        delete: [column F, column G, column H, column I, column J, column K, column L, column M, column N, column O, column P,
+        column Q, column R, column S, column T, column U, column V, column W, column X, column Y, column Z, column AA, column AB, column AC,
+        column AD, column AE, column AF, column AG, column AH, column AI, column AJ, column AK, column AL, column AM, column AN, column AO, column AP,
+        column AQ, column AR, column AS];
+    }
+
+    block HeaderWriter oftype CellWriter {
+        at: range A1:G1;
+
+        write: ["year", "month", "goods_id", "goods_name", "goods_source", "abroad", "total"];
+    }
+    
+
+    block GoodsTransportedTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "year" oftype text,
+            "month" oftype text,
+            "goods_id" oftype TextSpecificPattern,
+            "goods_name" oftype text,
+            "goods_source" oftype text,
+            "abroad" oftype PositiveIntegers,
+            "total" oftype PositiveIntegers
+        ];
+    }
+
+    block GoodsTransportedLoader oftype SQLiteLoader {
+        table: "goods";
+        file: "./goodsTransportedByTrain.sqlite";
+    }
+}
+
+valuetype PositiveIntegers oftype integer {
+	constraints: [
+		OnlyPositiveIntegers,
+	];
+}
+
+constraint OnlyPositiveIntegers oftype RangeConstraint {
+    lowerBound: 1;
+}
+
+valuetype TextSpecificPattern oftype text {
+	constraints: [
+		NSTSpecificPattern,
+	];
+}
+
+constraint NSTSpecificPattern on text:
+	value matches /^NST7-[0-9A-Z]{3}$/;
+
+valuetype GermanMonth oftype text {
+	constraints: [
+		OnlyGermanMonth,
+	];
+}
+
+constraint OnlyGermanMonth on text:
+	value matches /^(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)$/;
+
