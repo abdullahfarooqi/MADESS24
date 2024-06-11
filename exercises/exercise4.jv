@@ -1,0 +1,103 @@
+pipeline TempTransformPipeline {
+
+    TempTransformExtractor
+        -> TempZipInterpreter
+        -> TempDataPicker
+        -> TempTransformTextFileInterpreter
+        -> TempTransformCSVInterpreter
+        -> ColDataSelector
+        -> ExtraColsDeleter
+        -> HeaderWriter
+        -> TempTransformTableInterpreter
+        -> TempTransformer
+        -> BatteryTempTransformer
+        -> TempTransformLoader;
+
+    // 6. Below the pipes, we usually define the blocks 
+    // that are connected by the pipes.
+
+    // 7. Blocks instantiate a blocktype by using the oftype keyword.
+    // The blocktype defines the available properties that the block
+    // can use to specify the intended behavior of the block 
+    block TempTransformExtractor oftype HttpExtractor {
+        url: "https://www.mowesta.com/data/measure/mowesta-dataset-20221107.zip"; 
+    }
+    block TempZipInterpreter oftype ArchiveInterpreter {
+        archiveType: "zip";
+    }
+    block TempDataPicker oftype FilePicker {
+        path: "/data.csv";
+    }
+
+    // 9. The HttpExtractor requires no input and produces a binary file as output.
+    // This file has to be interpreted, e.g., as text file.
+    block TempTransformTextFileInterpreter oftype TextFileInterpreter { }
+
+    // 10. Next, we interpret the text file as sheet.
+    // A sheet only contains text cells and is useful for manipulating the shape of data before assigning more strict value types to cells.
+    block TempTransformCSVInterpreter oftype CSVInterpreter {
+        delimiter: ";";
+    }
+
+    block ExtraColsDeleter oftype ColumnDeleter {
+        delete: [column F, column G, column H, column I];
+    }
+
+    block ColDataSelector oftype CellRangeSelector {
+        select: range A1:K*;
+    }
+
+    block HeaderWriter oftype CellWriter {
+        at: range A1:F1;
+
+        write: ["id", "producer", "model", "month", "temperature", "battery_temperature"];
+    }
+
+
+    transform CelsiusToFahrenheit {
+        from tempCelsius oftype decimal;
+        to tempFahrenheit oftype decimal;
+        tempFahrenheit: (tempCelsius * 9/5) + 32;
+    }
+   
+    block TempTransformer oftype TableTransformer {
+        inputColumns: ['temperature'];
+        outputColumn: 'temperature';
+        use: CelsiusToFahrenheit;
+    }
+
+    block BatteryTempTransformer oftype TableTransformer {
+        inputColumns: ['battery_temperature'];
+        outputColumn: 'battery_temperature';
+        use: CelsiusToFahrenheit;
+    }
+
+    block TempTransformTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "id" oftype PositiveIntegers,
+            "producer" oftype text,
+            "model" oftype text,
+            "month" oftype integer,
+            "temperature" oftype decimal,
+            "battery_temperature" oftype decimal,
+            "Geraet aktiv" oftype text
+        ];
+    }
+
+    block TempTransformLoader oftype SQLiteLoader {
+        table: "temperatures";
+        file: "./temperatures.sqlite";
+    }
+}
+
+valuetype PositiveIntegers oftype integer {
+	constraints: [
+		OnlyPositiveIntegers,
+	];
+}
+
+constraint OnlyPositiveIntegers oftype RangeConstraint {
+    lowerBound: 1;
+}
+
