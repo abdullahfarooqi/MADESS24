@@ -1,0 +1,74 @@
+pipeline StopDataPipeline {
+	StopDataExtractor 
+		-> ZipArchiveInterpreter
+		-> StopDataFilePicker
+		-> StopDataTextFileInterpreter
+		-> StopDataCSVInterpreter
+		-> StopDataTableInterpreter
+		-> StopDataLoader;
+	
+	// 6. Below the pipes, we usually define the blocks 
+    // that are connected by the pipes.
+
+    // 7. Blocks instantiate a blocktype by using the oftype keyword.
+    // The blocktype defines the available properties that the block
+    // can use to specify the intended behavior of the block
+
+	block StopDataExtractor oftype HttpExtractor {
+		url: 'https://gtfs.rhoenenergie-bus.de/GTFS.zip';
+	}
+
+	block ZipArchiveInterpreter oftype ArchiveInterpreter {
+        archiveType: "zip";
+    }
+
+	block StopDataFilePicker oftype FilePicker {
+		path:'/stops.txt';
+	}
+
+	block StopDataTextFileInterpreter oftype TextFileInterpreter {
+		encoding: "utf8";
+	}
+
+    block StopDataCSVInterpreter oftype CSVInterpreter {
+		delimiter: ',';
+        enclosing: '"';
+		enclosingEscape: '"';
+	}
+
+	block StopDataTableInterpreter oftype TableInterpreter {
+		header: true;
+		columns: [
+			'stop_id' oftype integer,
+			'stop_name' oftype text,
+			'stop_lat' oftype CoordinateConstraint,
+			'stop_lon' oftype CoordinateConstraint,
+			'zone_id' oftype ZoneConstraint,
+		];
+	}
+
+    block StopDataLoader oftype SQLiteLoader {
+        table: "stops";
+        file: "./gtfs.sqlite";
+    }
+}
+
+valuetype CoordinateConstraint oftype decimal {
+    constraints: [
+        ValidCoordinate,
+    ];
+}	
+constraint ValidCoordinate oftype RangeConstraint {
+	lowerBound: -90.0;
+	lowerBoundInclusive: true;
+	upperBound: 90.0;
+	upperBoundInclusive: true;
+}
+
+valuetype ZoneConstraint oftype integer {
+    constraints: [
+        ZoneOf1645,
+    ];
+}	
+constraint ZoneOf1645 on integer:
+  value == 1645;
